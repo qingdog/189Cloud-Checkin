@@ -1,39 +1,42 @@
+import os
 import time
 import re
 import json
 import base64
 import hashlib
 # from urllib import parse
-import urllib.parse,hmac
+import urllib.parse, hmac
 import rsa
 import requests
 import random
-  
+
+from dotenv import load_dotenv
+
 BI_RM = list("0123456789abcdefghijklmnopqrstuvwxyz")
-  
+
 B64MAP = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-  
+
 s = requests.Session()
-  
+
 accounts = [
     {"username": "123456", "password": "123456"},
     {"username": "1234567", "password": "1234567"},
     # 添加更多账号和密码
 ]
-  
+
 # 钉钉机器人token 申请key 并设置密钥
 ddtoken = ""
 ddsecret = ""
 # xuthuskey = "27a...........................7b"
-  
+
 if not ddtoken:
     print("第36行的ddtoken 为空，签到结果将不会通过钉钉发送")
-  
-  
+
+
 def int2char(a):
     return BI_RM[a]
-  
-  
+
+
 def b64tohex(a):
     d = ""
     e = 0
@@ -61,23 +64,23 @@ def b64tohex(a):
     if e == 1:
         d += int2char(c << 2)
     return d
-  
-  
+
+
 def rsa_encode(j_rsakey, string):
     rsa_key = f"-----BEGIN PUBLIC KEY-----\n{j_rsakey}\n-----END PUBLIC KEY-----"
     pubkey = rsa.PublicKey.load_pkcs1_openssl_pem(rsa_key.encode())
     result = b64tohex((base64.b64encode(rsa.encrypt(f'{string}'.encode(), pubkey))).decode())
     return result
-  
-  
+
+
 def calculate_md5_sign(params):
     return hashlib.md5('&'.join(sorted(params.split('&'))).encode('utf-8')).hexdigest()
-  
-  
+
+
 def login(username, password):
-    #https://m.cloud.189.cn/login2014.jsp?redirectURL=https://m.cloud.189.cn/zhuanti/2021/shakeLottery/index.html
-    url=""
-    urlToken="https://m.cloud.189.cn/udb/udb_login.jsp?pageId=1&pageKey=default&clientType=wap&redirectURL=https://m.cloud.189.cn/zhuanti/2021/shakeLottery/index.html"
+    # https://m.cloud.189.cn/login2014.jsp?redirectURL=https://m.cloud.189.cn/zhuanti/2021/shakeLottery/index.html
+    url = ""
+    urlToken = "https://m.cloud.189.cn/udb/udb_login.jsp?pageId=1&pageKey=default&clientType=wap&redirectURL=https://m.cloud.189.cn/zhuanti/2021/shakeLottery/index.html"
     s = requests.Session()
     r = s.get(urlToken)
     pattern = r"https?://[^\s'\"]+"  # 匹配以http或https开头的url
@@ -87,7 +90,7 @@ def login(username, password):
         # print(url)  # 打印url
     else:  # 如果没有找到匹配
         print("没有找到url")
-  
+
     r = s.get(url)
     # print(r.text)
     pattern = r"<a id=\"j-tab-login-link\"[^>]*href=\"([^\"]+)\""  # 匹配id为j-tab-login-link的a标签，并捕获href引号内的内容
@@ -97,7 +100,7 @@ def login(username, password):
         # print("href:" + href)  # 打印href链接
     else:  # 如果没有找到匹配
         print("没有找到href链接")
-  
+
     r = s.get(href)
     captchaToken = re.findall(r"captchaToken' value='(.+?)'", r.text)[0]
     lt = re.findall(r'lt = "(.+?)"', r.text)[0]
@@ -105,7 +108,7 @@ def login(username, password):
     paramId = re.findall(r'paramId = "(.+?)"', r.text)[0]
     j_rsakey = re.findall(r'j_rsaKey" value="(\S+)"', r.text, re.M)[0]
     s.headers.update({"lt": lt})
-  
+
     username = rsa_encode(j_rsakey, username)
     password = rsa_encode(j_rsakey, password)
     url = "https://open.e.189.cn/api/logbox/oauth2/loginSubmit.do"
@@ -132,7 +135,8 @@ def login(username, password):
     redirect_url = r.json()['toUrl']
     r = s.get(redirect_url)
     return s
- 
+
+
 def main():
     for account in accounts:
         username = account["username"]
@@ -158,7 +162,7 @@ def main():
             else:
                 print(f"已经签到过了，签到获得{netdiskBonus}M空间")
                 res1 = f"已经签到过了，签到获得{netdiskBonus}M空间"
- 
+
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Linux; Android 5.1.1; SM-G930K Build/NRD90M; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/74.0.3729.136 Mobile Safari/537.36 Ecloud/8.6.3 Android/22 clientId/355325117317828 clientModel/SM-G930K imsi/460071114317824 clientChannelId/qq proVersion/1.0.6',
                 "Referer": "https://m.cloud.189.cn/zhuanti/2016/sign/index.jsp?albumBackupOpened=1",
@@ -173,7 +177,7 @@ def main():
                 description = response.json()['description']
                 print(f"抽奖获得{description}")
                 res2 = f"抽奖获得{description}"
- 
+
         response = s.get(url2, headers=headers)
         if ("errorCode" in response.text):
             print(response.text)
@@ -182,7 +186,7 @@ def main():
             description = response.json()['description']
             print(f"抽奖获得{description}")
             res3 = f"抽奖获得{description}"
- 
+
         response = s.get(url3, headers=headers)
         if ("errorCode" in response.text):
             print(response.text)
@@ -191,7 +195,7 @@ def main():
             description = response.json()['description']
             print(f"链接3抽奖获得{description}")
             res4 = f"链接3抽奖获得{description}"
- 
+
         if ddtoken.strip():
             _ = ddtoken.strip()
             timestamp = str(round(time.time() * 1000))
@@ -212,24 +216,27 @@ def main():
             response = requests.post(
                 url=url, data=json.dumps(data), headers=headers, timeout=15
             ).json()
- 
+
             if not response["errcode"]:
                 print("钉钉机器人 推送成功！")
             else:
                 print("钉钉机器人 推送失败！")
- 
+
+
 def lambda_handler(event, context):  # aws default
     main()
-  
-  
+
+
 def main_handler(event, context):  # tencent default
     main()
-  
-  
+
+
 def handler(event, context):  # aliyun default
     main()
-  
-  
+
+accounts.clear()
+load_dotenv()
+accounts.append({"username": os.getenv("USERNAME189"), "password": os.getenv("PASSWORD189")})
 if __name__ == "__main__":
     # time.sleep(random.randint(5, 30))
     main()
